@@ -31,6 +31,9 @@ class Users(AbstractBaseModel):
     roles: fields.ManyToManyRelation["Role"]
     tokens: fields.ReverseRelation["UserToken"]
 
+    class Meta:
+        ordering = ["-created_at"]
+
     def __str__(self):
         return str(self.username)
 
@@ -46,6 +49,9 @@ class Role(AbstractBaseModel):
         model_name="models.Users", related_name="roles"
     )
 
+    class Meta:
+        ordering = ["-created_at"]
+
 
 class Comments(AbstractBaseModel):
     """用户评论模型"""
@@ -55,6 +61,10 @@ class Comments(AbstractBaseModel):
     user: fields.ForeignKeyRelation[Users] = fields.ForeignKeyField(
         model_name="models.Users", related_name="comments"
     )
+
+    class Meta:
+        table = "user_comment"
+        ordering = ["-created_at"]
 
     def __str__(self):
         return str(self.id)
@@ -74,13 +84,16 @@ class UserToken(AbstractBaseModel):
         model_name="models.Users", related_name="tokens"
     )
 
+    class Meta:
+        table = "user_token"
+
 
 class TestCase(AbstractBaseModel):
     """测试用例表"""
 
     case_no = fields.CharField(max_length=10, unique=True, description="用例编号")
-    case_title = fields.CharField(max_length=30, index=True, description="用例名称/标题")
-    case_description = fields.CharField(max_length=50, null=True, description="用例说明")
+    case_title = fields.CharField(max_length=50, index=True, description="用例名称/标题")
+    case_description = fields.CharField(max_length=100, null=True, description="用例说明")
     case_module = fields.CharField(max_length=20, description="用例模块")
     case_sub_module = fields.CharField(max_length=20, null=True, description="用例子模块")
     case_is_execute = fields.IntEnumField(
@@ -95,7 +108,9 @@ class TestCase(AbstractBaseModel):
         default=ApiMethodEnum.GET,
         description="api请求方法",
     )
-    request_headers = fields.CharField(max_length=500,null=True, description="请求头,必须为json")
+    request_headers = fields.CharField(
+        max_length=500, null=True, description="请求头,必须为json"
+    )
     request_param_type = fields.CharEnumField(
         max_length=10,
         enum_type=RequestParamTypeEnum,
@@ -118,19 +133,74 @@ class TestCase(AbstractBaseModel):
     )
     case_editor = fields.CharField(max_length=20, null=True, description="用例编写者")
     remark = fields.CharField(max_length=100, null=True, description="备注")
+    testsuite: fields.ManyToManyRelation["TestSuite"]
+
+    class Meta:
+        table = "test_case"
+        ordering = ["-created_at"]
 
 
+class TestSuite(AbstractBaseModel):
+    """测试套件表"""
+
+    suite_no = fields.CharField(max_length=10, unique=True, description="套件编号")
+    suite_title = fields.CharField(max_length=50, index=True, description="套件名称/标题")
+    remark = fields.CharField(max_length=100, null=True, description="备注")
+    testcase: fields.ManyToManyRelation[TestCase] = fields.ManyToManyField(
+        model_name="models.TestCase", related_name="testsuite"
+    )
+
+    class Meta:
+        table = "test_suite"
+        ordering = ["-created_at"]
+
+
+class TestEnv(AbstractBaseModel):
+    """测试环境表"""
+
+    summary = fields.CharField(max_length=30, description="测试环境名称")
+    test_env_url = fields.CharField(max_length=50, index=True, description="测试环境地址")
+    remark = fields.CharField(max_length=100, null=True, description="备注")
+
+    class Meta:
+        table = "test_environment"
+        ordering = ["-created_at"]
+
+
+# response schema
 # 用户schema
 User_Pydantic = pydantic_model_creator(
-    Users, name="User", exclude=("password", "is_delete")
-)
-Login_pydantic = pydantic_model_creator(Users, name="Login_models")
-UserIn_Pydantic = pydantic_model_creator(
-    Users, name="UserIn_models", exclude_readonly=True
+    Users,
+    name="UserTo",
+    exclude=("password", "is_delete"),
 )
 # 评论schema
-Comment_Pydantic = pydantic_model_creator(Comments, name="CommentTo")
+Comment_Pydantic = pydantic_model_creator(
+    Comments,
+    name="CommentTo",
+    exclude=("is_delete",),
+)
 # 角色schema
-Role_Pydantic = pydantic_model_creator(Role, name="RoleTo")
+Role_Pydantic = pydantic_model_creator(
+    Role,
+    name="RoleTo",
+    exclude=("is_delete",),
+)
 # 测试用例schema
-Testcase_Pydantic = pydantic_model_creator(TestCase, name="TestCaseTo")
+Testcase_Pydantic = pydantic_model_creator(
+    TestCase,
+    name="TestCaseTo",
+    exclude=("is_delete",),
+)
+# 测试套件schema
+Testsuite_Pydantic = pydantic_model_creator(
+    TestSuite,
+    name="TestSuiteTo",
+    exclude=("is_delete",),
+)
+# 测试环境schema
+Testenv_Pydantic = pydantic_model_creator(
+    TestEnv,
+    name="TestEnvTo",
+    exclude=("is_delete",),
+)
