@@ -9,6 +9,7 @@ from fastapi import (
     Header,
 )
 from passlib.hash import md5_crypt
+from tortoise.transactions import in_transaction
 from tortoise.contrib.fastapi import HTTPNotFoundError
 from tortoise.exceptions import DoesNotExist
 from ..core.security import (
@@ -166,6 +167,27 @@ async def update_user(user_id: int, user: user_schema.UserIn):
     result = await Users.filter(id=user_id).update(**user.dict(exclude_unset=True))
     log.debug(f"update更新{result}条数据")
     return ResultResponse[user_schema.UserOut](result=await Users.get(id=user_id))
+
+
+@router.delete(
+    "/batchDelete",
+    summary="批量删除用户",
+    response_model=ResultResponse[str],
+    # dependencies=[Depends(check_jwt_auth), Depends(Authority("user,delete"))],
+)
+async def batch_delete_user(body: user_schema.BatchDelete):
+    """批量删除用户
+
+    Args:
+        body (user_schema.BatchDelete): _description_
+
+    Returns:
+        _type_: _description_
+    """
+    async with in_transaction():  # 事务
+        # 使用 filter 方法过滤出要删除的记录，然后delete删除
+        users_to_delete = await Users.filter(id__in=body.users_id).delete()
+    return ResultResponse[str](message=f"successful deleted {users_to_delete} users!")
 
 
 @router.delete(

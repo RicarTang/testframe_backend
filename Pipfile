@@ -25,6 +25,7 @@ openpyxl = "*"
 aiofiles = "*"
 pyyaml = "*"
 loguru = "*"
+win32-setctime = "*"
 asynccasbin = "*"
 
 [dev-packages]
