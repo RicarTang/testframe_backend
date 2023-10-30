@@ -27,6 +27,8 @@ pyyaml = "*"
 loguru = "*"
 win32-setctime = "*"
 asynccasbin = "*"
+aiohttp = {extras = ["speedups"], version = "*"}
+pytest = "*"
 
 [dev-packages]
 black = "*"
