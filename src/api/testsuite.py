@@ -4,7 +4,8 @@ from fastapi import (
     Query,
 )
 from tortoise.exceptions import DoesNotExist
-from ..db.models import TestSuite
+from tortoise.transactions import in_transaction
+from ..db.models import TestSuite, TestCase
 from ..schemas import ResultResponse, testsuite_schema
 from ..utils.log_util import log
 from ..utils.exceptions.testsuite import TestsuiteNotExistException
@@ -24,8 +25,12 @@ async def add_testsuite(body: testsuite_schema.TestSuiteIn):
     Args:
         body (testsuite_schema.TestSuiteIn): _description_
     """
-    result = await TestSuite.create(**body.dict())
-    return ResultResponse[testsuite_schema.TestSuiteTo](result=result)
+    async with in_transaction():
+        testsuite = await TestSuite.create(**body.dict())
+        testcase_result = await TestCase.get(id=body.testcase_id)
+        await testsuite.testcases.add(testcase_result)
+        await testsuite.fetch_related('testcases')
+    return ResultResponse[testsuite_schema.TestSuiteTo](result=testsuite)
 
 
 @router.get(
@@ -43,11 +48,18 @@ async def get_all_testsuite(
         limit (Optional[int], optional): _description_. Defaults to Query(default=20, ge=10).
         page (Optional[int], optional): _description_. Defaults to Query(default=1, gt=0).
     """
-    testsuite_list = await TestSuite.all().offset(limit * (page - 1)).limit(limit)
+    # 使用prefetch_related预取关联的testcase列表
+    query_list = (
+        await TestSuite.all()
+        .prefetch_related("testcases")
+        .offset(limit * (page - 1))
+        .limit(limit)
+    )
     total = await TestSuite.all().count()
+    # return testsuites_list
     return ResultResponse[testsuite_schema.TestSuitesTo](
         result=testsuite_schema.TestSuitesTo(
-            data=testsuite_list,
+            data=query_list,
             page=page,
             limit=limit,
             total=total,
@@ -67,7 +79,7 @@ async def get_testsuite(suite_id: int):
         suite_id (int): _description_
     """
     try:
-        result = await TestSuite.get(id=suite_id)
+        result = await TestSuite.get(id=suite_id).prefetch_related("testcase")
     except DoesNotExist:
         raise TestsuiteNotExistException
     return ResultResponse[testsuite_schema.TestSuiteTo](result=result)
